@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Behavior Mirror</title>
+<style>
+body{margin:0;overflow:hidden;background:black;}
+canvas{display:block;}
+#ui{
+ position:absolute;
+ top:10px;
+ left:10px;
+ color:white;
+ font-family:Arial;
+}
+</style>
+</head>
+<body>
+
+<div id="ui">Adapt.</div>
+<canvas id="c"></canvas>
+
+<script>
+const c=document.getElementById("c");
+const ctx=c.getContext("2d");
+
+let w,h;
+function resize(){
+ w=c.width=innerWidth;
+ h=c.height=innerHeight;
+}
+addEventListener("resize",resize);
+resize();
+
+let player={
+ x:w/2,
+ y:h/2,
+ size:15,
+ speed:4
+};
+
+let keys={};
+addEventListener("keydown",e=>keys[e.key.toLowerCase()]=true);
+addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
+
+let history=[];
+let pressure={w:0,a:0,s:0,d:0};
+
+function updatePressure(){
+ // decay slowly (memory fade)
+ for(let k in pressure){
+   pressure[k]*=0.98;
+ }
+
+ // reward unpredictability
+ let total=pressure.w+pressure.a+pressure.s+pressure.d;
+
+ // strongest habit
+ let max=Math.max(...Object.values(pressure));
+
+ // predictability ratio
+ return total>0 ? max/total : 0;
+}
+
+function move(){
+ let moved=false;
+
+ if(keys["w"]){
+   player.y-=player.speed;
+   pressure.w+=1;
+   moved=true;
+ }
+ if(keys["s"]){
+   player.y+=player.speed;
+   pressure.s+=1;
+   moved=true;
+ }
+ if(keys["a"]){
+   player.x-=player.speed;
+   pressure.a+=1;
+   moved=true;
+ }
+ if(keys["d"]){
+   player.x+=player.speed;
+   pressure.d+=1;
+   moved=true;
+ }
+
+ if(moved){
+   history.push({x:player.x,y:player.y});
+   if(history.length>300) history.shift();
+ }
+
+ player.x=Math.max(0,Math.min(w,player.x));
+ player.y=Math.max(0,Math.min(h,player.y));
+}
+
+function drawBackground(predictability){
+ // more predictable = red pressure
+ let r=Math.floor(predictability*255);
+ ctx.fillStyle=`rgb(${r},0,20)`;
+ ctx.fillRect(0,0,w,h);
+}
+
+function drawHistory(){
+ ctx.fillStyle="rgba(0,200,255,0.2)";
+ for(let i=0;i<history.length;i+=6){
+   let p=history[i];
+   ctx.fillRect(p.x-3,p.y-3,6,6);
+ }
+}
+
+function applyPsychology(predictability){
+ // predictable players get slowed
+ player.speed=4 - predictability*2.5;
+
+ // clamp speed
+ if(player.speed<1.3) player.speed=1.3;
+}
+
+function drawPlayer(){
+ ctx.fillStyle="white";
+ ctx.beginPath();
+ ctx.arc(player.x,player.y,player.size,0,Math.PI*2);
+ ctx.fill();
+}
+
+function loop(){
+ requestAnimationFrame(loop);
+
+ let predictability=updatePressure();
+
+ applyPsychology(predictability);
+ move();
+
+ drawBackground(predictability);
+ drawHistory();
+ drawPlayer();
+
+ document.getElementById("ui").textContent =
+  "Predictability: "+Math.floor(predictability*100)+"%";
+}
+loop();
+</script>
+
+</body>
+</html>
